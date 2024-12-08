@@ -86,27 +86,4 @@ interface IBlessnetBeacon is IBlessnetStructs {
   function getMessageIsValidBySender(
     address sender_
   ) external view returns (bool);
-
-  /**
-   * @dev updateRelayer: Update the relayer address
-   *
-   * @param relayerAddress_ The new relayer address
-   * @param bufferInSeconds_ The buffer in seconds for how long the
-   * previous address should be a valid relayer. This allows the update of the
-   * beacons within a suitable update window to migrate to the new relayer signer.
-   * This can be set to zero seconds i.e. the previous relayer is immediately invalid.
-   */
-  function updateRelayer(
-    address relayerAddress_,
-    uint32 bufferInSeconds_
-  ) external;
-
-  /**
-   * @dev updateExchangeRates: Update held exchange values
-   *
-   */
-  function updateExchangeRates(
-    uint256 integerNativeInBless_,
-    uint256 integerBlessInNative_
-  ) external;
 }

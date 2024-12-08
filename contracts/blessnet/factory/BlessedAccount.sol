@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "../../core/BaseAccount.sol";
 import "../../core/Helpers.sol";
 import "../../samples/callback/TokenCallbackHandler.sol";
-import "../interfaces/IBlessnetBeacon.sol";
+import "../beacon/IBlessnetBeacon.sol";
 
 /**
  * minimal account.
@@ -49,8 +49,9 @@ contract BlessedAccount is BaseAccount, TokenCallbackHandler, Initializable {
   // solhint-disable-next-line no-empty-blocks
   receive() external payable {}
 
-  constructor(IEntryPoint anEntryPoint) {
+  constructor(IEntryPoint anEntryPoint, IBlessnetBeacon beacon_) {
     _entryPoint = anEntryPoint;
+    _beacon = beacon_;
     _disableInitializers();
   }
 
@@ -95,9 +96,6 @@ contract BlessedAccount is BaseAccount, TokenCallbackHandler, Initializable {
   }
 
   /**
-   * @dev The _entryPoint member is immutable, to reduce gas consumption.  To upgrade EntryPoint,
-   * a new implementation of SimpleAccount must be deployed with the new EntryPoint address, then upgrading
-   * the implementation by calling `upgradeTo()`
    * @param platform_ the platform for this blessed account.
    * @param userId_ the userId for this blessed account.
    */
@@ -118,17 +116,23 @@ contract BlessedAccount is BaseAccount, TokenCallbackHandler, Initializable {
   }
 
   /// implement template method of BaseAccount
+  /// @notice
+  /// Validate that the message has been signed by the relayer. In this implementation the relayer
+  /// service is trusted to check that the origin of the message is from the platform and userId
+  /// indicated. In future implementations this will be replaced with a call to a WASM contract
+  /// that validates the JWT has been signed by the specified account on the external platform.
   function _validateSignature(
     PackedUserOperation calldata userOp,
     bytes32 userOpHash
   ) internal virtual override returns (uint256 validationData) {
     bytes32 hash = MessageHashUtils.toEthSignedMessageHash(userOpHash);
-
     address relayer = _beacon.getCurrentRelayer();
-
-    if (relayer != ECDSA.recover(hash, userOp.signature))
-      return SIG_VALIDATION_FAILED;
-    return SIG_VALIDATION_SUCCESS;
+    address signer = ECDSA.recover(hash, userOp.signature);
+    if (relayer != signer) {
+      revert("relay only");
+    } else {
+      return SIG_VALIDATION_SUCCESS;
+    }
   }
 
   function _call(address target, uint256 value, bytes memory data) internal {

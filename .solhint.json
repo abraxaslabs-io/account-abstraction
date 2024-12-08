@@ -7,6 +7,7 @@
     "explicit-types": ["warn", "explicit"],
     "no-global-import": ["off"],
     "immutable-vars-naming": ["off"],
-    "mark-callable-contracts": ["off"]
+    "mark-callable-contracts": ["off"],
+    "no-console": "[off]"
   }
 }

@@ -14,9 +14,15 @@ import "./BlessedAccount.sol";
  */
 contract BlessedAccountFactory {
   BlessedAccount public immutable accountImplementation;
+  IBlessnetBeacon public immutable _beacon;
 
-  constructor(IEntryPoint _entryPoint) {
-    accountImplementation = new BlessedAccount(_entryPoint);
+  constructor(IEntryPoint entryPoint_, IBlessnetBeacon beacon_) {
+    accountImplementation = new BlessedAccount(entryPoint_, beacon_);
+    _beacon = beacon_;
+  }
+
+  function beacon() public view virtual returns (IBlessnetBeacon) {
+    return _beacon;
   }
 
   /**
@@ -27,17 +33,20 @@ contract BlessedAccountFactory {
    */
   function createAccount(
     string calldata platform_,
-    string calldata userId_,
-    uint256 salt_
+    string calldata userId_
   ) public returns (BlessedAccount ret) {
-    address addr = getAddress(platform_, userId_, salt_);
+    // The salt is a hash of the concatenated hashes of the platform and user id, so that each
+    // unique platform/userId pair creates a single account address, and so we don't get
+    // multiple platform/userId pairs that would create the same salt (e.g. twitter omnus would
+    // produce the same hash as twitt eromnus if we just hashed the concatenated strings).
+    (address addr, bytes32 salt) = getAddress(platform_, userId_);
     uint256 codeSize = addr.code.length;
     if (codeSize > 0) {
       return BlessedAccount(payable(addr));
     }
     ret = BlessedAccount(
       payable(
-        new ERC1967Proxy{salt: bytes32(salt_)}(
+        new ERC1967Proxy{salt: bytes32(salt)}(
           address(accountImplementation),
           abi.encodeCall(BlessedAccount.initialize, (platform_, userId_))
         )
@@ -50,12 +59,17 @@ contract BlessedAccountFactory {
    */
   function getAddress(
     string calldata platform_,
-    string calldata userId_,
-    uint256 salt
-  ) public view returns (address) {
-    return
+    string calldata userId_
+  ) public view returns (address, bytes32) {
+    bytes32 salt = keccak256(
+      abi.encodePacked(
+        keccak256(abi.encodePacked(platform_)),
+        keccak256(abi.encodePacked(userId_))
+      )
+    );
+    return (
       Create2.computeAddress(
-        bytes32(salt),
+        salt,
         keccak256(
           abi.encodePacked(
             type(ERC1967Proxy).creationCode,
@@ -65,6 +79,8 @@ contract BlessedAccountFactory {
             )
           )
         )
-      );
+      ),
+      salt
+    );
   }
 }
