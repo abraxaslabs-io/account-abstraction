@@ -3,9 +3,9 @@ import { ethers } from 'hardhat'
 import { expect } from 'chai'
 import {
   ERC1967Proxy__factory,
-  BlessedAccount,
-  BlessedAccountFactory__factory,
-  BlessedAccount__factory,
+  BlessedAccountV1,
+  BlessedAccountFactoryV1__factory,
+  BlessedAccountV1__factory,
   TestCounter,
   TestCounter__factory,
   TestUtil,
@@ -24,7 +24,7 @@ import { fillUserOpDefaults, getUserOpHash, encodeUserOp, signUserOp, packUserOp
 import { parseEther } from 'ethers/lib/utils'
 import { UserOperation } from './UserOperation'
 
-describe('BlessedAccount', function () {
+describe.only('BlessedAccount', function () {
   let entryPoint: string
   let accounts: string[]
   let testUtil: TestUtil
@@ -49,7 +49,7 @@ describe('BlessedAccount', function () {
   })
 
   describe('#validateUserOp', () => {
-    let account: BlessedAccount
+    let account: BlessedAccountV1
     let userOp: UserOperation
     let userOpHash: string
     let preBalance: number
@@ -70,10 +70,10 @@ describe('BlessedAccount', function () {
       const hhBeacon = await beacon.deploy(relayer)
 
       // cant use "BlessedAccountFactory", since it attempts to increment nonce first
-      const implementation = await new BlessedAccount__factory(ethersSigner).deploy(entryPointEoa, hhBeacon.address)
+      const implementation = await new BlessedAccountV1__factory(ethersSigner).deploy(entryPointEoa, hhBeacon.address)
 
       const proxy = await new ERC1967Proxy__factory(ethersSigner).deploy(implementation.address, '0x')
-      account = BlessedAccount__factory.connect(proxy.address, epAsSigner)
+      account = BlessedAccountV1__factory.connect(proxy.address, epAsSigner)
 
       await ethersSigner.sendTransaction({ from: accounts[0], to: account.address, value: parseEther('0.2') })
       const callGasLimit = 200000
@@ -120,7 +120,7 @@ describe('BlessedAccount', function () {
   context('BlessedAccountFactory', () => {
     it('sanity: check deployer', async () => {
       const ownerAddr = createAddress()
-      const deployer = await new BlessedAccountFactory__factory(ethersSigner).deploy(entryPoint, accounts[9])
+      const deployer = await new BlessedAccountFactoryV1__factory(ethersSigner).deploy(entryPoint, accounts[9])
       const target = await deployer.callStatic.createAccount(platform, userId)
       expect(await isDeployed(target)).to.eq(false)
       await deployer.createAccount(platform, userId)

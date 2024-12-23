@@ -1,26 +1,33 @@
-// SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.23;
+// SPDX-License-Identifier: MIT
+/**
+ * @title BlessedAccountV1.sol. Blessnet abstracted account, version 1.
+ *
+ * @author abraxas https://abraxaslabs.io
+ *         for
+ *         blessnet https://bless.net
+ *
+ *         version 0.1.0
+ */
 
-/* solhint-disable avoid-low-level-calls */
-/* solhint-disable no-inline-assembly */
-/* solhint-disable reason-string */
+pragma solidity 0.8.23;
 
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import "../../core/BaseAccount.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {BaseAccount, IEntryPoint, PackedUserOperation} from "../../core/BaseAccount.sol";
 import "../../core/Helpers.sol";
-import "../../samples/callback/TokenCallbackHandler.sol";
-import "../beacon/IBlessnetBeacon.sol";
+import {TokenCallbackHandler} from "../../samples/callback/TokenCallbackHandler.sol";
+import {IBlessnetBeacon} from "../beacon/IBlessnetBeacon.sol";
 
 /**
- * minimal account.
- *  this is sample minimal account.
+ * Minimal account.
  *  has execute, eth handling methods
- *  has a single signer that can send requests through the entryPoint.
+ *  has a single signer (relay) that can send requests through the entryPoint.
  */
-contract BlessedAccount is BaseAccount, TokenCallbackHandler, Initializable {
-  IBlessnetBeacon public immutable _beacon;
+contract BlessedAccountV1 is BaseAccount, TokenCallbackHandler, Initializable {
+  uint256 public constant VERSION = 1;
+
+  IBlessnetBeacon private immutable _beacon;
   IEntryPoint private immutable _entryPoint;
 
   string public platform;
@@ -33,11 +40,36 @@ contract BlessedAccount is BaseAccount, TokenCallbackHandler, Initializable {
   );
 
   modifier onlyThisAddress() {
-    require(msg.sender == address(this), "only self");
+    require(msg.sender == address(this), "Only self E01");
     _;
   }
 
-  /// @inheritdoc BaseAccount
+  constructor(IEntryPoint anEntryPoint, IBlessnetBeacon beacon_) {
+    _entryPoint = anEntryPoint;
+    _beacon = beacon_;
+    _disableInitializers();
+  }
+
+  /**
+   * @param platform_ the platform for this blessed account.
+   * @param userId_ the userId for this blessed account.
+   */
+  function initialize(
+    string calldata platform_,
+    string calldata userId_
+  ) public virtual initializer {
+    _initialize(platform_, userId_);
+  }
+
+  function _initialize(
+    string calldata platform_,
+    string calldata userId_
+  ) internal virtual {
+    platform = platform_;
+    userId = userId_;
+    emit BlessedAccountInitialized(_entryPoint, platform_, userId_);
+  }
+
   function entryPoint() public view virtual override returns (IEntryPoint) {
     return _entryPoint;
   }
@@ -46,14 +78,7 @@ contract BlessedAccount is BaseAccount, TokenCallbackHandler, Initializable {
     return _beacon;
   }
 
-  // solhint-disable-next-line no-empty-blocks
   receive() external payable {}
-
-  constructor(IEntryPoint anEntryPoint, IBlessnetBeacon beacon_) {
-    _entryPoint = anEntryPoint;
-    _beacon = beacon_;
-    _disableInitializers();
-  }
 
   /**
    * execute a transaction
@@ -93,26 +118,6 @@ contract BlessedAccount is BaseAccount, TokenCallbackHandler, Initializable {
         _call(dest[i], value[i], func[i]);
       }
     }
-  }
-
-  /**
-   * @param platform_ the platform for this blessed account.
-   * @param userId_ the userId for this blessed account.
-   */
-  function initialize(
-    string calldata platform_,
-    string calldata userId_
-  ) public virtual initializer {
-    _initialize(platform_, userId_);
-  }
-
-  function _initialize(
-    string calldata platform_,
-    string calldata userId_
-  ) internal virtual {
-    platform = platform_;
-    userId = userId_;
-    emit BlessedAccountInitialized(_entryPoint, platform_, userId_);
   }
 
   /// implement template method of BaseAccount
