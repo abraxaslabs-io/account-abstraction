@@ -13,10 +13,10 @@ import {
   EntryPoint,
   EntryPoint__factory,
   IERC20,
-  BlessedAccount,
-  BlessedAccountFactory__factory,
-  BlessedAccount__factory,
-  BlessedAccountFactory,
+  BlessedAccountV1,
+  BlessedAccountFactoryV1__factory,
+  BlessedAccountV1__factory,
+  BlessedAccountFactoryV1,
   TestPaymasterRevertCustomError__factory, TestERC20__factory,
   
 } from '../typechain'
@@ -99,7 +99,7 @@ export async function calcGasUsage (rcpt: ContractReceipt, entryPoint: EntryPoin
 }
 
 // helper function to create the initCode to deploy the account, using our account factory.
-export function getAccountInitCode (platform: string, userId: string, factory: BlessedAccountFactory, salt = 0): BytesLike {
+export function getAccountInitCode (platform: string, userId: string, factory: BlessedAccountFactoryV1, salt = 0): BytesLike {
   return hexConcat([
     factory.address,
     factory.interface.encodeFunctionData('createAccount', [platform, userId])
@@ -107,7 +107,7 @@ export function getAccountInitCode (platform: string, userId: string, factory: B
 }
 
 // given the parameters as AccountDeployer, return the resulting "counterfactual address" that it would create.
-export async function getAccountAddress (platform: string, userId: string, factory: BlessedAccountFactory, salt = 0): Promise<string> {
+export async function getAccountAddress (platform: string, userId: string, factory: BlessedAccountFactoryV1, salt = 0): Promise<string> {
   return (await factory.getAddress(platform, userId))[0]
 }
 
@@ -283,11 +283,11 @@ export async function createAccount (
   userId: string,
   entryPoint: string,
   relayer: string,
-  _factory?: BlessedAccountFactory
+  _factory?: BlessedAccountFactoryV1
 ):
   Promise<{
-    proxy: BlessedAccount
-    accountFactory: BlessedAccountFactory
+    proxy: BlessedAccountV1
+    accountFactory: BlessedAccountFactoryV1
     implementation: string
   }> {
 
@@ -295,11 +295,11 @@ export async function createAccount (
 
   const hhBeacon = await beacon.deploy(relayer)
 
-  const accountFactory = _factory ?? await new BlessedAccountFactory__factory(ethersSigner).deploy(entryPoint, hhBeacon.address)
+  const accountFactory = _factory ?? await new BlessedAccountFactoryV1__factory(ethersSigner).deploy(entryPoint, hhBeacon.address)
   const implementation = await accountFactory.accountImplementation()
   await accountFactory.createAccount(platform, userId)
   const accountAddress = await accountFactory.getAddress(platform, userId)
-  const proxy = BlessedAccount__factory.connect(accountAddress[0], ethersSigner)
+  const proxy = BlessedAccountV1__factory.connect(accountAddress[0], ethersSigner)
   return {
     implementation,
     accountFactory,
