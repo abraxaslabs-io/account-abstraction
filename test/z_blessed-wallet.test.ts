@@ -38,7 +38,7 @@ describe.only('BlessedAccount', function () {
   let relayer: string
 
   platform = "telegram"
-  userId = "omnus"
+  userId = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("omnus"))
 
   platform2 = "x"
 

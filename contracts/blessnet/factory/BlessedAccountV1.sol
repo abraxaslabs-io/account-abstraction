@@ -11,13 +11,13 @@
 
 pragma solidity 0.8.23;
 
+import {IBlessedAccountV1, IBlessnetBeacon} from "./IBlessedAccountV1.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {BaseAccount, IEntryPoint, PackedUserOperation} from "../../core/BaseAccount.sol";
 import "../../core/Helpers.sol";
 import {TokenCallbackHandler} from "../../samples/callback/TokenCallbackHandler.sol";
-import {IBlessnetBeacon} from "../beacon/IBlessnetBeacon.sol";
 
 /**
  * Minimal account.
@@ -29,14 +29,13 @@ contract BlessedAccountV1 is BaseAccount, TokenCallbackHandler, Initializable {
 
   IBlessnetBeacon private immutable _beacon;
   IEntryPoint private immutable _entryPoint;
-
-  string public platform;
-  string public userId;
+  string private _platform;
+  bytes32 private _userIdHash;
 
   event BlessedAccountInitialized(
     IEntryPoint indexed entryPoint,
     string indexed platform,
-    string indexed userId
+    bytes32 indexed userIdHash
   );
 
   modifier onlyThisAddress() {
@@ -52,22 +51,22 @@ contract BlessedAccountV1 is BaseAccount, TokenCallbackHandler, Initializable {
 
   /**
    * @param platform_ the platform for this blessed account.
-   * @param userId_ the userId for this blessed account.
+   * @param userIdHash_ the userIdHash for this blessed account.
    */
   function initialize(
     string calldata platform_,
-    string calldata userId_
+    bytes32 userIdHash_
   ) public virtual initializer {
-    _initialize(platform_, userId_);
+    _initialize(platform_, userIdHash_);
   }
 
   function _initialize(
     string calldata platform_,
-    string calldata userId_
+    bytes32 userIdHash_
   ) internal virtual {
-    platform = platform_;
-    userId = userId_;
-    emit BlessedAccountInitialized(_entryPoint, platform_, userId_);
+    _platform = platform_;
+    _userIdHash = userIdHash_;
+    emit BlessedAccountInitialized(_entryPoint, platform_, userIdHash_);
   }
 
   function entryPoint() public view virtual override returns (IEntryPoint) {
@@ -76,6 +75,14 @@ contract BlessedAccountV1 is BaseAccount, TokenCallbackHandler, Initializable {
 
   function beacon() public view virtual returns (IBlessnetBeacon) {
     return _beacon;
+  }
+
+  function platform() public view returns (string memory) {
+    return _platform;
+  }
+
+  function userIdHash() public view returns (bytes32) {
+    return _userIdHash;
   }
 
   receive() external payable {}
@@ -123,7 +130,7 @@ contract BlessedAccountV1 is BaseAccount, TokenCallbackHandler, Initializable {
   /// implement template method of BaseAccount
   /// @notice
   /// Validate that the message has been signed by the relayer. In this implementation the relayer
-  /// service is trusted to check that the origin of the message is from the platform and userId
+  /// service is trusted to check that the origin of the message is from the platform and userIdHash
   /// indicated. In future implementations this will be replaced with a call to a WASM contract
   /// that validates the JWT has been signed by the specified account on the external platform.
   function _validateSignature(

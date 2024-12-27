@@ -11,7 +11,7 @@
 
 pragma solidity 0.8.23;
 
-import {BlessedAccountV1, IBlessnetBeacon, IEntryPoint} from "./BlessedAccountV1.sol";
+import {IBlessedAccountFactoryV1, BlessedAccountV1, IBlessnetBeacon, IEntryPoint} from "./IBlessedAccountFactoryV1.sol";
 import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
@@ -21,7 +21,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
  * The factory's createAccount returns the target account address even if it is already installed.
  * This way, the entryPoint.getSenderAddress() can be called either before or after the account is created.
  */
-contract BlessedAccountFactoryV1 {
+contract BlessedAccountFactoryV1 is IBlessedAccountFactoryV1 {
   uint256 public constant VERSION = 1;
 
   BlessedAccountV1 private immutable _accountImplementation;
@@ -53,18 +53,18 @@ contract BlessedAccountFactoryV1 {
    * This method returns an existing account address so that entryPoint.getSenderAddress() would work even after account creation
    *
    * @param platform_ The platform we are creating an account for.
-   * @param userId_ The userId on the platform we are creating an account for.
+   * @param userIdHash_ The userIdHash on the platform we are creating an account for.
    * @return account_ The address of the account.
    */
   function createAccount(
     string calldata platform_,
-    string calldata userId_
+    bytes32 userIdHash_
   ) public payable returns (BlessedAccountV1 account_) {
     // The salt is a hash of the concatenated hashes of the platform and user id, so that each
     // unique platform/userId pair creates a single account address, and so we don't get
     // multiple platform/userId pairs that would create the same salt (e.g. twitter omnus would
     // produce the same hash as twitt eromnus if we just hashed the concatenated strings).
-    (address addr, bytes32 salt) = getAddress(platform_, userId_);
+    (address addr, bytes32 salt) = getAddress(platform_, userIdHash_);
     uint256 codeSize = addr.code.length;
     if (codeSize > 0) {
       account_ = BlessedAccountV1(payable(addr));
@@ -73,7 +73,10 @@ contract BlessedAccountFactoryV1 {
         payable(
           new ERC1967Proxy{salt: bytes32(salt)}(
             address(_accountImplementation),
-            abi.encodeCall(BlessedAccountV1.initialize, (platform_, userId_))
+            abi.encodeCall(
+              BlessedAccountV1.initialize,
+              (platform_, userIdHash_)
+            )
           )
         )
       );
@@ -90,19 +93,16 @@ contract BlessedAccountFactoryV1 {
    * calculate the counterfactual address of this account as it would be returned by createAccount()
    *
    * @param platform_ The platform we are creating an account for.
-   * @param userId_ The userId on the platform we are creating an account for.
+   * @param userIdHash_ The userIdHash on the platform we are creating an account for.
    * @return account_ The address of the account.
    * @return salt_ The salt used to derive the account address.
    */
   function getAddress(
     string calldata platform_,
-    string calldata userId_
+    bytes32 userIdHash_
   ) public view returns (address account_, bytes32 salt_) {
     bytes32 salt = keccak256(
-      abi.encodePacked(
-        keccak256(abi.encodePacked(platform_)),
-        keccak256(abi.encodePacked(userId_))
-      )
+      abi.encodePacked(keccak256(abi.encodePacked(platform_)), userIdHash_)
     );
     return (
       Create2.computeAddress(
@@ -112,7 +112,10 @@ contract BlessedAccountFactoryV1 {
             type(ERC1967Proxy).creationCode,
             abi.encode(
               address(_accountImplementation),
-              abi.encodeCall(BlessedAccountV1.initialize, (platform_, userId_))
+              abi.encodeCall(
+                BlessedAccountV1.initialize,
+                (platform_, userIdHash_)
+              )
             )
           )
         )
